@@ -1,0 +1,6 @@
+# Ignore large downloaded/generated files
+data/models/
+embeddings/
+
+# Python cache
+__pycache__/
