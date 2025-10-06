@@ -165,7 +165,7 @@ if __name__ == "__main__":
     os.makedirs("embeddings", exist_ok=True)
 
     print("Loading annotation data...")
-    df = load_ecoli("Ecoli_Annotation_v2.tsv")
+    df = load_ecoli("Ecoli_Annotation_v3.tsv")
     print(f"Successfully loaded {len(df)} rows.")
 
     dna_sequences = df["DNA_Sequence_Input"].tolist()
@@ -193,4 +193,3 @@ if __name__ == "__main__":
     print("ESM-2 embeddings saved.")
 
     print("\nAll embeddings generated and saved successfully.")
-

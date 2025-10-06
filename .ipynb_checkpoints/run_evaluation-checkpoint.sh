@@ -16,8 +16,6 @@
 # 3. Run '4_train_model.py' to train all models and generate residual files.
 # 4. Execute 'post_train.sh' to perform the final analysis.
 
-python 3_generate_embeddings.py
-
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -64,11 +62,8 @@ fi
 echo "--- Training script completed successfully. ---"
 echo ""
 
-# --- STEP 2: Run Post-Training Analysis ---
-echo "======================================================================"
-echo "STEP 2: Running Post-Training Analysis Script (post_train.sh)"
-echo "This will consume the generated files to produce all final plots and metrics."
-echo "======================================================================"
+# --- STEP 2: Run Post-Training Continued Optimization and Analysis ---
+
 bash post_train.sh
 if [ $? -ne 0 ]; then
     echo "FATAL: Post-training analysis script (post_train.sh) failed."
@@ -83,3 +78,4 @@ echo "PIPELINE COMPLETED SUCCESSFULLY!"
 echo "Final plots are in the 'analysis_plots/' directory."
 echo "Final metrics and analysis CSVs are in the 'metrics/' directory."
 echo "======================================================================"
+
