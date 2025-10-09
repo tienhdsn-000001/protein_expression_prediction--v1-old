@@ -1,22 +1,17 @@
 
-# Understanding the Bayesian Optimization Convergence Plots
+# Bayesian Optimization Explained
 
-The plots titled "Bayesian Optimization Convergence" illustrate how the hyperparameter tuning process found progressively better models.
+These plots illustrate the process of hyperparameter tuning for each model.
 
-## How to Read the Graph
+## How to Interpret the Convergence Plots
 
--   **X-axis (Optimization Call):** This represents each "step" or "trial" in the optimization process. For each step, the optimizer chooses a new set of hyperparameters to try.
--   **Y-axis (Best R² Found):** This shows the best cross-validated R² score discovered *up to that point*.
+- **X-Axis (Optimization Call):** Represents each time the optimizer trained and evaluated a new model with a different set of hyperparameters (like `learning_rate`, `max_depth`, etc.).
+- **Y-Axis (Best R² Found):** Shows the best cross-validation R² score found *up to that point*. The line will only ever go up or stay flat, as it tracks the best performance seen so far.
+- **What is a "Training Step"?** In this context, a "training step" or "optimization call" is a full cycle of:
+    1. The Bayesian optimizer picking a new set of hyperparameters it thinks might be promising.
+    2. Training a complete XGBoost model from scratch using those parameters on folds of the training data.
+    3. Evaluating the model on a validation fold.
+    4. Repeating this across all cross-validation folds to get a robust R² score.
+    5. Feeding that score back to the optimizer, which updates its internal "map" of the hyperparameter space.
 
-An ideal convergence plot shows the R² value rapidly increasing in the early calls and then plateauing. This indicates that the optimizer has successfully explored the hyperparameter space and settled on a high-performing region.
-
-## What are "Training Steps" in Bayesian Optimization?
-
-Unlike neural networks that train over thousands of *epochs* or *steps* with gradient descent, the "training" in this context is different. Each **"call"** or **"step"** on the x-axis represents:
-
-1.  **Selecting Hyperparameters:** The Bayesian optimizer picks a promising set of hyperparameters (e.g., `n_estimators`, `learning_rate`).
-2.  **Full Model Training & Cross-Validation:** An XGBoost model is trained from scratch with these hyperparameters on the training data, and its performance is evaluated using 3-fold group cross-validation.
-3.  **Recording the Score:** The average R² from the cross-validation is recorded.
-4.  **Updating the Belief:** The optimizer uses this new result to update its internal probability model of which hyperparameter sets are most likely to yield the best results.
-
-This cycle repeats for the total number of calls (`N_OPTIMIZATION_CALLS` = 25 in the script). The plot tracks the best score found throughout this entire search process.
+A steep upward slope indicates the optimizer is quickly finding better parameter combinations. A long plateau means it is struggling to find improvements over the current best-known parameters.
