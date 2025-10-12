@@ -1,0 +1,13 @@
+data_fraction,variant,target,holdout_r2,holdout_mse,n_estimators,learning_rate,max_depth,subsample,colsample_bytree
+100pct_data,baseline,log2_ppm_abundance,-0.1453808009629109,21.68111801341155,,,,,
+100pct_data,embeddings_only,log2_ppm_abundance,0.4129714608670273,11.111968197373944,956.0,0.01,5.0,0.5627135179798796,1.0
+100pct_data,baseline,log2_tpm_abundance,-1.0030098484675785,7.155960509276476,,,,,
+100pct_data,embeddings_only,log2_tpm_abundance,0.138715961344485,3.077026592058107,645.0,0.01,9.0,0.6164757817022026,0.7558762807265726
+100pct_data,baseline,protein_half_life,-0.3408527216896218,3.0263399502569315,,,,,
+100pct_data,embeddings_only,protein_half_life,0.1265939428424174,1.971300502147341,1000.0,0.01,3.0,0.5,0.5
+100pct_data,baseline,mrna_min_half_life_delta,-0.8369694238437251,8.476047435885134,,,,,
+100pct_data,embeddings_only,mrna_min_half_life_delta,0.0259941772268998,4.494206299514028,470.0,0.01,3.0,0.6429803127947008,1.0
+100pct_data,baseline,mrna_max_half_life_delta,-0.11857480473824,559265.2068511035,,,,,
+100pct_data,embeddings_only,mrna_max_half_life_delta,-0.0075821014456567415,503771.0575971197,100.0,0.01,10.0,0.5,1.0
+100pct_data,baseline,mrna_half_life,-0.8877017003173631,36.20718916373867,,,,,
+100pct_data,embeddings_only,mrna_half_life,0.016578205420490932,18.8625877372984,1000.0,0.01,10.0,0.570728230180156,1.0

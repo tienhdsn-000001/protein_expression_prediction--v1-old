@@ -1,0 +1,26 @@
+# Python & Environment Caches
+__pycache__/
+*.pyc
+.cache/
+.config/
+.npm/
+.local/
+.docker/
+.triton/
+.cupy/
+
+# Project Specific Outputs & Data
+embeddings/
+models/
+
+
+tmp_preds/
+data/
+don't_include/
+
+*.pkl
+*.npy
+*.npz
+
+(delete me) nil/
+
