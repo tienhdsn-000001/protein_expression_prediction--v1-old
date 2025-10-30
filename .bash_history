@@ -1,15 +1,3 @@
-
-don't include/
-tmp_preds/
-
-*.pkl
-*.npy" > .gitignore
-git init
-git init -b main
-git add .
-git commit -m "recurated data and delta half life models"
-  git config --global user.email "tien.hdns@gmail.com"
-  git config --global user.name "hudst-000001"
 git commit -m "recurated data and delta half life models"
 git remote add origin [https://github.com/tienhdsn-000001/protein_expression_prediction.git](https://github.com/tienhdsn-000001/protein_expression_prediction.git)
 git remote add origin https://github.com/tienhdsn-000001/protein_expression_prediction.git
@@ -498,3 +486,15 @@ python 6_analyze_results.py
 python 6_analyze_results.py
 python 6_analyze_results.py
 python 6_analyze_results.py
+python 6_analyze_results.py
+nano .gitignore
+git add .
+git init -b main
+git add .
+git commit -m "Post-CodonBERT fail. RiNALMo, RNAErnie, ESM2-15B, further reporting"
+git remote add origin https://github.com/tienhdsn-000001/protein_expression_prediction
+git push -u origin main
+python3 6_analyze_results.py
+python3 6_analyze_results.py
+python3 6_analyze_results.py
+python3 6_analyze_results.py

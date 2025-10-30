@@ -1,2 +1,1 @@
-/opt/conda/envs/main_env
-/opt/conda/envs/dnabert2_env
+

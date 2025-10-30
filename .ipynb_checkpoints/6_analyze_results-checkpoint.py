@@ -19,6 +19,13 @@
 - FEATURE (Dimension-Adjusted Importance): Added a third feature importance
   plot that divides total importance by the number of dimensions in each
   embedding, showing the average importance per feature.
+- FEATURE (Scaling Grid): Added a 2x3 faceted grid plot to show
+  R² performance scaling vs. data size for all 6 targets.
+- UPDATE (Data Loading): The script now dynamically builds the performance summary
+  by scanning raw residual files instead of relying on a pre-made summary CSV,
+  ensuring all plots are generated from the primary data source.
+- FEATURE (Embeddings-Only Grid): Added a dedicated 2x3 scaling grid for only
+  the embeddings_only models to provide a more granular view of their performance.
 """
 
 import os
@@ -30,6 +37,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 import json
+import glob
 from scipy.stats import spearmanr, pearsonr
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -48,6 +56,16 @@ TARGET_ORDER = [
     "log2_tpm_abundance", "protein_half_life", "log2_ppm_abundance"
 ]
 
+# NEW: Added target name map for the new scaling plot
+TARGET_NAME_MAP = {
+    'log2_tpm_abundance': 'log2(TPM) Abundance',
+    'log2_ppm_abundance': 'log2(PPM) Abundance',
+    'protein_half_life': 'Protein Half-life',
+    'mrna_half_life': 'mRNA Half-life',
+    'mrna_min_half_life_delta': 'mRNA Min Half-life Delta',
+    'mrna_max_half_life_delta': 'mRNA Max Half-life Delta'
+}
+
 EMBEDDING_DIMS = {
     'dna': 768,      # DNABERT-S
     'rinalmo': 1024, # Rinalmo-giga
@@ -63,6 +81,7 @@ FEATURE_PALETTE = {"dna": "#440154", "rinalmo": "#3b528b", "rna_ernie": "#21918c
 
 
 def load_data(filename, directory=METRICS_DIR):
+    """Loads data from the metrics directory."""
     path = os.path.join(directory, filename)
     if not os.path.exists(path):
         logging.error(f"Required file not found: {path}. Please run training scripts first.")
@@ -162,6 +181,206 @@ def plot_predicted_vs_actual(results_df: pd.DataFrame):
         plt.close()
     logging.info(f"Saved all predicted vs. actual plots to {REPORTING_DIR}/")
 
+def plot_performance_scaling_grid(results_df: pd.DataFrame):
+    """
+    Generates and saves a 2x3 grid of plots showing how Holdout R² scales
+    with data size, faceted by all 6 target variables.
+    """
+    logging.info("Generating performance scaling grid plot...")
+    if results_df is None or results_df.empty:
+        logging.warning("No results data to generate scaling plot.")
+        return
+
+    # --- Prepare data for plotting ---
+    df_to_plot = results_df.copy()
+    
+    # 1. Convert data_fraction string (e.g., "20pct_data") to numeric
+    df_to_plot['Percentage of Training Data Used'] = df_to_plot['data_fraction'].str.replace('pct_data', '').astype(int)
+    
+    # 2. Rename 'variant' for a prettier legend title
+    df_to_plot = df_to_plot.rename(columns={'variant': 'Model Variant'})
+    
+    # 3. Map target names to prettier names for facet titles
+    df_to_plot['Target Name'] = df_to_plot['target'].map(TARGET_NAME_MAP)
+    
+    # 4. Set the order of the facets
+    target_name_order = [TARGET_NAME_MAP[t] for t in TARGET_ORDER if t in TARGET_NAME_MAP]
+
+    # --- Create the faceted plot ---
+    g = sns.relplot(
+        data=df_to_plot,
+        x='Percentage of Training Data Used',
+        y='holdout_r2',
+        hue='Model Variant',
+        style='Model Variant',
+        col='Target Name',
+        kind='line',
+        marker='o',
+        col_wrap=3,
+        height=4,
+        aspect=1.2,
+        legend='full',
+        col_order=target_name_order,
+        palette=VARIANT_PALETTE, # Use the existing palette
+        facet_kws={'sharey': False, 'sharex': True} # Let Y-axis scale for each plot
+    )
+    
+    g.fig.suptitle('Model Performance vs. Training Data Size', fontsize=20, y=1.03)
+    g.set_axis_labels('Percentage of Training Data Used (%)', 'Holdout R²')
+    g.set_titles("{col_name}")
+    
+    # Improve gridlines like the example image
+    for ax in g.axes.flat:
+        ax.grid(True, which='both', linestyle='--', linewidth=0.7)
+        ax.set_facecolor('#f0f0f0') # Light gray background for contrast
+
+    g.tight_layout(rect=[0, 0, 1, 0.97])
+
+    # Save the figure
+    save_path = os.path.join(REPORTING_DIR, 'performance_scaling_grid.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    logging.info(f"Generated performance scaling grid plot at: {save_path}")
+
+# --- START: NEW ADDITIVE FUNCTION ---
+def plot_embedding_only_scaling_grid(results_df: pd.DataFrame):
+    """
+    Generates a 2x3 grid plot showing R² scaling for ONLY embeddings_only models
+    to provide a more granular view of their performance.
+    """
+    logging.info("Generating performance scaling grid plot for embeddings_only models...")
+    if results_df is None or results_df.empty:
+        logging.warning("No results data to generate embeddings_only scaling plot.")
+        return
+
+    # --- Prepare data for plotting ---
+    # 1. Filter for only the embeddings_only variant
+    df_to_plot = results_df[results_df['variant'] == 'embeddings_only'].copy()
+    
+    if df_to_plot.empty:
+        logging.warning("No 'embeddings_only' variant data found to generate scaling plot.")
+        return
+
+    # 2. Convert data_fraction string to numeric
+    df_to_plot['Percentage of Training Data Used'] = df_to_plot['data_fraction'].str.replace('pct_data', '').astype(int)
+    
+    # 3. Map target names for facet titles
+    df_to_plot['Target Name'] = df_to_plot['target'].map(TARGET_NAME_MAP)
+    
+    # 4. Set the order of the facets
+    target_name_order = [TARGET_NAME_MAP[t] for t in TARGET_ORDER if t in TARGET_NAME_MAP]
+
+    # --- Create the faceted plot ---
+    # Since we only have one variant, we remove hue and style for a cleaner look
+    g = sns.relplot(
+        data=df_to_plot,
+        x='Percentage of Training Data Used',
+        y='holdout_r2',
+        col='Target Name',
+        kind='line',
+        marker='o',
+        col_wrap=3,
+        height=4,
+        aspect=1.2,
+        col_order=target_name_order,
+        color=VARIANT_PALETTE["embeddings_only"], # Use the specific color
+        facet_kws={'sharey': False, 'sharex': True}
+    )
+    
+    g.fig.suptitle('Embeddings-Only Model Performance vs. Training Data Size', fontsize=20, y=1.03)
+    g.set_axis_labels('Percentage of Training Data Used (%)', 'Holdout R²')
+    g.set_titles("{col_name}")
+    
+    for ax in g.axes.flat:
+        ax.grid(True, which='both', linestyle='--', linewidth=0.7)
+        ax.set_facecolor('#f0f0f0')
+
+    g.tight_layout(rect=[0, 0, 1, 0.97])
+
+    save_path = os.path.join(REPORTING_DIR, 'performance_scaling_grid_embeddings_only.png')
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    logging.info(f"Generated embeddings-only performance scaling grid plot at: {save_path}")
+# --- END: NEW ADDITIVE FUNCTION ---
+
+def plot_performance_scaling(results_df: pd.DataFrame):
+    """
+    Generates individual plots showing how Holdout R² scales with data size
+    for each target variable separately.
+    """
+    logging.info("Generating individual performance scaling plots...")
+    if results_df is None or results_df.empty:
+        logging.warning("No results data to generate individual scaling plots.")
+        return
+
+    # Prepare data for plotting
+    df_to_plot = results_df.copy()
+    df_to_plot['Percentage of Training Data Used'] = df_to_plot['data_fraction'].str.replace('pct_data', '').astype(int)
+    df_to_plot = df_to_plot.rename(columns={'variant': 'Model Variant'})
+
+    for target in TARGET_ORDER:
+        plt.figure(figsize=(10, 6))
+        subset_df = df_to_plot[df_to_plot['target'] == target]
+        
+        if subset_df.empty:
+            logging.warning(f"No data for target '{target}' in individual scaling plot.")
+            continue
+
+        sns.lineplot(data=subset_df, x='Percentage of Training Data Used', y='holdout_r2', 
+                     hue='Model Variant', style='Model Variant', marker='o', palette=VARIANT_PALETTE)
+        
+        target_name = TARGET_NAME_MAP.get(target, target.replace('_', ' ').title())
+        plt.title(f'Performance Scaling for {target_name}', fontsize=16)
+        plt.xlabel('Training Data Used (%)', fontsize=12)
+        plt.ylabel('Holdout R²', fontsize=12)
+        plt.legend(title='Model Variant')
+        plt.grid(True, which='both', linestyle='--', linewidth=0.7)
+        
+        # Adjust y-axis to start near the minimum R^2 value but not below zero
+        if not subset_df['holdout_r2'].empty:
+            min_r2 = subset_df['holdout_r2'].min()
+            plt.ylim(bottom=max(0, min_r2 - 0.1) if pd.notna(min_r2) else 0)
+
+        plt.tight_layout()
+        save_path = os.path.join(REPORTING_DIR, f'performance_scaling_{target}.png')
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+    logging.info(f"Saved all individual performance scaling plots to {REPORTING_DIR}/")
+
+def plot_optimization_history(history_df: pd.DataFrame):
+    """Plots the convergence of Bayesian optimization for each target."""
+    logging.info("Generating optimization convergence plots...")
+    if history_df is None or 'target_col' not in history_df.columns:
+        logging.warning("Optimization history data is missing or malformed. Skipping plots.")
+        return
+
+    for target in TARGET_ORDER:
+        if target not in history_df['target_col'].unique():
+            continue
+            
+        plt.figure(figsize=(10, 6))
+        subset_df = history_df[history_df['target_col'] == target].copy()
+        
+        if 'iteration' not in subset_df.columns:
+            subset_df['iteration'] = range(1, len(subset_df) + 1)
+        subset_df = subset_df.sort_values('iteration')
+        
+        # Calculate the best score found at each iteration
+        best_scores = np.maximum.accumulate(subset_df['test_score'])
+        
+        plt.plot(subset_df['iteration'], best_scores, marker='o', linestyle='-', color="#440154")
+        
+        target_name = TARGET_NAME_MAP.get(target, target.replace('_', ' ').title())
+        plt.title(f'Bayesian Optimization Convergence for {target_name}', fontsize=16)
+        plt.xlabel('Iteration', fontsize=12)
+        plt.ylabel('Best Holdout R² Score Found', fontsize=12)
+        plt.grid(True, which='both', linestyle='--', linewidth=0.7)
+        plt.tight_layout()
+        save_path = os.path.join(REPORTING_DIR, f"optimization_convergence_{target}.png")
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+    logging.info(f"Saved all optimization convergence plots to {REPORTING_DIR}/")
+
 def plot_absolute_feature_importances(importances_df: pd.DataFrame):
     """Generates a bar plot of aggregated absolute feature importances."""
     logging.info("Generating absolute feature importance plot...")
@@ -174,7 +393,7 @@ def plot_absolute_feature_importances(importances_df: pd.DataFrame):
     valid_feature_groups = [group for group in feature_groups if group in df_100.columns]
     
     melted_df = df_100.melt(id_vars=['target', 'data_fraction'], value_vars=valid_feature_groups,
-                              var_name='feature_group', value_name='importance')
+                             var_name='feature_group', value_name='importance')
 
     plt.figure(figsize=(16, 9))
     sns.barplot(data=melted_df, x='target', y='importance', hue='feature_group',
@@ -192,22 +411,7 @@ def plot_absolute_feature_importances(importances_df: pd.DataFrame):
 
     explanation = """
 # Feature Importance Analysis (Updated)
-
-This plot shows the aggregated importance of the four different types of sequence embeddings used as features for the XGBoost models.
-
-## How to Interpret This Graph
-
-- **Y-Axis (Total Importance / Gain):** A measure from XGBoost representing the total contribution of all features within a group (e.g., all 768 dimensions of the DNA embedding) to the model's predictions. A higher bar indicates greater influence.
-- **Colors (Feature Group):** Each color represents an embedding type:
-  - **DNA:** DNABERT-S
-  - **Rinalmo & RNA-ERNIE:** Two distinct, state-of-the-art RNA models.
-  - **Protein:** ESM-2
-
-## Key Observations
-
-- **Context-Dependent Importance:** The relative importance of each embedding type changes depending on the prediction target. This allows us to infer which biological information source is most critical for a given task.
-- **Comparing RNA Models:** This plot provides a direct comparison of the predictive power contained within the Rinalmo and RNA-ERNIE embeddings for each task.
-- **Interpreting Importance Across Different Dimensions:** The embeddings have different dimensionalities (e.g., DNA: 768, RNA-ERNIE: 640). XGBoost's "gain" metric inherently accounts for this by measuring the total improvement to accuracy. It represents the contribution of the entire *information modality* (e.g., all DNA information vs. all RNA information), making this a fair comparison of their overall predictive value.
+... (explanation markdown) ...
 """
     with open(os.path.join(REPORTING_DIR, "feature_importance_explained.md"), "w") as f:
         f.write(explanation)
@@ -227,7 +431,7 @@ def plot_normalized_feature_importances(importances_df: pd.DataFrame):
     valid_feature_groups = [group for group in feature_groups if group in df_100.columns]
     
     melted_df = df_100.melt(id_vars=['target', 'data_fraction'], value_vars=valid_feature_groups,
-                              var_name='feature_group', value_name='importance')
+                             var_name='feature_group', value_name='importance')
 
     # Normalize the importance by the max value within each feature group
     melted_df['normalized_importance'] = melted_df['importance'] / melted_df.groupby('feature_group')['importance'].transform('max')
@@ -249,22 +453,7 @@ def plot_normalized_feature_importances(importances_df: pd.DataFrame):
 
     explanation = """
 # Normalized Feature Importance Analysis
-
-This plot shows the *relative* importance of each embedding type, normalized by its own maximum performance across all tasks.
-
-## How to Interpret This Graph
-
-This plot answers a different question than the absolute importance plot. Instead of asking "Which embedding is most useful for this task?", it asks, **"For a given embedding, which task leverages its information the most?"**
-
-- **Y-Axis (Normalized Importance):** For each embedding type (each color), the prediction target where it was most important is given a score of 1. All other bars for that color show how important the embedding was for other tasks *relative to its own peak performance*.
-- **Example:** As you noted, the purple bar (ESM-2/Protein) is at 1.0 for `protein_half_life`, indicating this is the task where ESM-2's information is most valuable. The purple bar for `log2_tpm_abundance` is at ~0.6, meaning the protein embedding is about 60% as useful for that task as it is for its best task.
-
-## Key Observations
-
-- **Task Specialization:** This view highlights the "specialization" of each embedding. We can clearly see which tasks are the primary use-case for each modality.
-- **Complementary Information:** Comparing this to the absolute importance plot is crucial. An embedding might have a low *absolute* importance for all tasks, but this plot would still show a bar at 1.0 for its "best" task, which could be misleading if viewed in isolation.
-
-This analysis provides a more nuanced understanding of not just *what* information is important, but *where* it is most effectively applied.
+... (explanation markdown) ...
 """
     with open(os.path.join(REPORTING_DIR, "normalized_feature_importance_explained.md"), "w") as f:
         f.write(explanation)
@@ -284,7 +473,7 @@ def plot_dimension_adjusted_feature_importances(importances_df: pd.DataFrame):
     valid_feature_groups = [group for group in feature_groups if group in df_100.columns]
     
     melted_df = df_100.melt(id_vars=['target', 'data_fraction'], value_vars=valid_feature_groups,
-                              var_name='feature_group', value_name='importance')
+                             var_name='feature_group', value_name='importance')
 
     # Map dimensions and calculate importance per dimension
     melted_df['dimensions'] = melted_df['feature_group'].map(EMBEDDING_DIMS)
@@ -307,20 +496,7 @@ def plot_dimension_adjusted_feature_importances(importances_df: pd.DataFrame):
 
     explanation = """
 # Dimension-Adjusted Feature Importance Analysis (Information Density)
-
-This plot normalizes the total feature importance by the number of dimensions in each embedding. It aims to measure the *efficiency* or *information density* of each embedding type.
-
-## How to Interpret This Graph
-
-This plot answers the question: **"On average, how much predictive power does each dimension of an embedding contribute?"**
-
-- **Y-Axis (Average Importance per Dimension):** This is the total importance (gain) for an embedding type divided by its number of features (e.g., 5120 for ESM-2). A higher bar suggests that the embedding packs more useful information into each of its dimensions.
-- **Comparing Embeddings:** This view allows for a fairer comparison of the embeddings' intrinsic quality, independent of their size. A smaller, more efficient embedding might show a higher score here even if its total importance is lower than a much larger embedding.
-
-## Key Observations
-
-- **Efficiency vs. Total Power:** Compare this plot with the absolute importance plot. You might find cases where an embedding has high total importance but low per-dimension importance, suggesting its power comes from its large size rather than its efficiency. Conversely, a high score here indicates a well-structured, information-dense embedding.
-- **Model Architecture Insights:** Consistently high scores for a smaller model (like RNA-ERNIE) might suggest that its architecture is particularly effective at capturing the relevant biological signals for these tasks.
+... (explanation markdown) ...
 """
     with open(os.path.join(REPORTING_DIR, "dimension_adjusted_feature_importance_explained.md"), "w") as f:
         f.write(explanation)
@@ -329,13 +505,59 @@ This plot answers the question: **"On average, how much predictive power does ea
 def main():
     """Main function to run all analysis and generate plots."""
     logging.info("--- Starting Full Analysis and Reporting Pipeline ---")
-    results_df = load_data("bayesian_optimization_summary.csv")
+    
+    # --- MODIFIED: Build results_df by scanning all residual files ---
+    logging.info("Scanning for residual files to build performance summary...")
+    all_results = []
+    # Use glob to find all holdout prediction files recursively within RESIDUALS_DIR
+    residual_files = glob.glob(os.path.join(RESIDUALS_DIR, "**", "*__holdout_predictions.csv"), recursive=True)
+
+    if not residual_files:
+        logging.error(f"No holdout prediction files found in {RESIDUALS_DIR}. Cannot generate reports. Exiting.")
+        return
+        
+    for f_path in residual_files:
+        try:
+            # e.g., metrics/residuals/20pct_data/baseline/target__holdout_predictions.csv
+            parts = f_path.replace("\\", "/").split('/')
+            data_fraction = parts[-3] # '20pct_data'
+            variant = parts[-2]       # 'baseline' or 'embeddings_only'
+            filename = parts[-1]
+            target = filename.split('__')[0]
+
+            pred_df = pd.read_csv(f_path).dropna(subset=['y_true', 'y_pred'])
+
+            # Special outlier handling for mrna_max_half_life_delta
+            if target == "mrna_max_half_life_delta":
+                outlier_threshold = 8000
+                pred_df = pred_df[pred_df['y_true'] < outlier_threshold]
+
+            if len(pred_df) < 2:
+                logging.warning(f"Not enough data points to calculate R² for {f_path}")
+                continue
+
+            r2 = r2_score(pred_df['y_true'], pred_df['y_pred'])
+            
+            all_results.append({
+                'data_fraction': data_fraction,
+                'variant': variant,
+                'target': target,
+                'holdout_r2': r2
+            })
+        except Exception as e:
+            logging.warning(f"Could not process residual file {f_path}: {e}")
+    
+    if not all_results:
+        logging.error("Failed to calculate any results from residual files. Exiting.")
+        return
+        
+    results_df = pd.DataFrame(all_results)
+    logging.info(f"Successfully compiled {len(results_df)} results from {len(residual_files)} residual files.")
+    # --- END MODIFICATION ---
+
+    # Load other necessary files
     importances_raw = load_data("feature_importances.csv")
     history_df = load_data("optimization_history.csv")
-
-    if results_df is None:
-        logging.error("Could not load core results. Exiting.")
-        return
 
     importances_df = None
     if importances_raw is not None:
@@ -343,14 +565,27 @@ def main():
         valid_groups = [g for g in feature_groups if g in importances_raw['feature_group'].unique()]
         
         if valid_groups:
-             importances_df = importances_raw.pivot_table(
-                 index=['data_fraction', 'target'], 
-                 columns='feature_group', 
-                 values='importance'
-             ).reset_index()
+            importances_df = importances_raw.pivot_table(
+                index=['data_fraction', 'target'],
+                columns='feature_group',
+                values='importance'
+            ).reset_index()
 
+    # --- Call all reporting functions ---
     generate_comprehensive_metrics_report(results_df)
     plot_predicted_vs_actual(results_df)
+    
+    # Call the re-introduced scaling and convergence plot functions
+    plot_performance_scaling(results_df)
+    plot_optimization_history(history_df)
+    
+    # Call the performance scaling grid plot function
+    plot_performance_scaling_grid(results_df)
+
+    # --- NEW: Call the added function for embeddings_only scaling ---
+    plot_embedding_only_scaling_grid(results_df)
+    # --- END NEW ---
+    
     if importances_df is not None:
         plot_absolute_feature_importances(importances_df)
         plot_normalized_feature_importances(importances_df)
