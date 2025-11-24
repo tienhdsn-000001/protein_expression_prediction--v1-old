@@ -1,2 +1,0 @@
-python 3_generate_embeddings.py
-bash run_evaluation.sh
