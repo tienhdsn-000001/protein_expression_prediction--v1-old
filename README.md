@@ -1,8 +1,8 @@
-# Protein Expression Prediction v1
+# Property Prediction Expression Prediction v1
 
-A machine learning pipeline for predicting E. coli protein expression characteristics using state-of-the-art biological sequence embeddings. This project combines DNA, RNA, and protein language models to predict multiple expression-related targets.
+A machine learning pipeline for predicting E. coli K-12 MG1655 protein expression characteristics using state-of-the-art biological sequence embeddings. This project combines DNA, RNA, and protein language models to predict multiple expression-related targets (protein/mRNA expression and half life).
 
-> **Note:** This is the archived v1 of this project. Development has moved to [v2](https://github.com/tienhdsn-000001/protein_expression_prediction) with improved architecture and additional features.
+> **Note:** This is the archived v1 of this project. Development has moved to v2 with a focus on protein expression, improved architecture, and additional features.
 
 ---
 
