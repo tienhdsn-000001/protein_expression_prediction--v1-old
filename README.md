@@ -55,7 +55,7 @@ Model performance as a function of training data size:
 
 Relative contribution of each embedding type to predictions:
 
-![Feature Importances](reporting/feature_importances.png)
+![Feature Importances](reporting/dimension_adjusted_feature_importances.png)
 
 ### Predicted vs Actual
 
@@ -226,7 +226,7 @@ If you use this code in your research, please cite:
 @software{protein_expression_prediction_v1,
   author = {tienhdsn-000001},
   title = {Protein Expression Prediction v1},
-  year = {2024},
+  year = {2025},
   url = {https://github.com/tienhdsn-000001/protein_expression_prediction--v1-old}
 }
 ```
